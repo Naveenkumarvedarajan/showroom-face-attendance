@@ -195,3 +195,63 @@ function ensureSheet_(ss,name,headers) {
   if(sh.getLastRow()===0) sh.appendRow(headers);
   return sh;
 }
+/**
+ * API entry point for the server-side proxy.
+ * Never put API_SECRET in the public GitHub frontend.
+ */
+function doPost(e) {
+  try {
+    const body = JSON.parse(
+      e && e.postData ? e.postData.contents : "{}"
+    );
+
+    const expectedSecret = PropertiesService
+      .getScriptProperties()
+      .getProperty("1XYoVpoysnk2Da67UqrQQwiF6mvNXVsBympp1_LmcZ__EMA_a3TAuxK3q");
+
+    if (!expectedSecret ||
+        typeof body.apiKey !== "string" ||
+        body.apiKey !== expectedSecret) {
+      return jsonResponse_({
+        ok: false,
+        message: "Unauthorized"
+      });
+    }
+
+    if (body.action === "ping") {
+      return jsonResponse_({
+        ok: true,
+        message: "Attendance API is running"
+      });
+    }
+
+    if (body.action === "attendance") {
+      const result = verifyAndMarkAttendance(
+        body.employeeId,
+        body.attendanceAction,
+        body.descriptor,
+        0.48
+      );
+
+      return jsonResponse_(result);
+    }
+
+    return jsonResponse_({
+      ok: false,
+      message: "Unsupported action"
+    });
+
+  } catch (error) {
+    console.error(error);
+    return jsonResponse_({
+      ok: false,
+      message: "Request failed"
+    });
+  }
+}
+
+function jsonResponse_(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
